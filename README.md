@@ -1,8 +1,7 @@
 # 🌾 Project Kisan - AI Farming Assistant
 
 [![GitHub Repo Size](https://img.shields.io/github/repo-size/yashh152004/Kisan-project?style=for-the-badge)](https://github.com/yashh152004/Kisan-project)
-[![Top Languages](https://img.shields.io/github/languages/top/yashh152004/Kisan-project?style=for-the-badge)](https://github.com/yashh152004/Kisan-project)
-[![License](https://img.shields.io/github/license/yashh152004/Kisan-project?style=for-the-badge)](https://github.com/yashh152004/Kisan-project/blob/main/LICENSE)
+
 
 ---
 
