@@ -2,24 +2,15 @@
 import { useState, useEffect } from "react";
 import "./App.css";
 import { auth } from "./firebase";
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
-  signOut,
-  GoogleAuthProvider,
-  signInWithPopup,
-  onAuthStateChanged,
-} from "firebase/auth";
+import { RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged } from "firebase/auth";
 
 function App() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
   const [message, setMessage] = useState("");
-  const [isLogin, setIsLogin] = useState(true);
   const [user, setUser] = useState(null);
+  const [confirmationResult, setConfirmationResult] = useState(null);
 
-  // Track Firebase auth state
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -27,97 +18,99 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // Email/Password login or signup
-  const handleAuth = async (e) => {
+  const setupRecaptcha = () => {
+    window.recaptchaVerifier = new RecaptchaVerifier(
+      "recaptcha-container",
+      {
+        size: "invisible",
+        callback: (response) => {
+          console.log("Recaptcha verified");
+        },
+      },
+      auth
+    );
+  };
+
+  const handleSendOtp = async (e) => {
     e.preventDefault();
+    if (!phone) {
+      setMessage("⚠️ Please enter your phone number.");
+      return;
+    }
+    setupRecaptcha();
+    const appVerifier = window.recaptchaVerifier;
     try {
-      if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
-        setMessage("✅ Login successful!");
-      } else {
-        await createUserWithEmailAndPassword(auth, email, password);
-        setMessage("🎉 Account created successfully!");
-      }
+      const result = await signInWithPhoneNumber(auth, phone, appVerifier);
+      setConfirmationResult(result);
+      setMessage("📩 OTP sent to your phone!");
     } catch (error) {
-      setMessage("❌ " + error.message);
+      setMessage("❌ Failed to send OTP: " + error.message);
     }
   };
 
-  // Forgot password
-  const handleResetPassword = async () => {
-    if (!email) {
-      setMessage("⚠️ Please enter your email to reset password.");
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (!otp) {
+      setMessage("⚠️ Please enter the OTP.");
+      return;
+    }
+    if (!confirmationResult) {
+      setMessage("⚠️ No OTP request found. Please request OTP first.");
       return;
     }
     try {
-      await sendPasswordResetEmail(auth, email);
-      setMessage("📩 Password reset email sent!");
+      const result = await confirmationResult.confirm(otp);
+      setUser(result.user);
+      setMessage("✅ Phone login successful!");
     } catch (error) {
-      setMessage("❌ " + error.message);
+      setMessage("❌ Invalid OTP. Please try again.");
     }
   };
 
-  // Logout
   const handleLogout = async () => {
     await signOut(auth);
+    setUser(null);
+    setConfirmationResult(null);
+    setPhone("");
+    setOtp("");
     setMessage("👋 Logged out successfully!");
-  };
-
-  // Google login
-  const handleGoogleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-      setMessage("✅ Google login successful!");
-    } catch (error) {
-      setMessage("❌ " + error.message);
-    }
   };
 
   return (
     <div className="App">
       <div className="login-container">
         {user ? (
-          // Logged-in view
           <div>
-            <h2>Welcome, {user.email}</h2>
+            <h2>Welcome, {user.phoneNumber}</h2>
             <button onClick={handleLogout}>Logout</button>
           </div>
         ) : (
-          // Login/Signup form
           <div>
-            <h2>{isLogin ? "Login" : "Sign Up"}</h2>
-            <form onSubmit={handleAuth}>
-              <input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <button type="submit">{isLogin ? "Login" : "Sign Up"}</button>
-            </form>
-
-            <p className="toggle" onClick={() => setIsLogin(!isLogin)}>
-              {isLogin
-                ? "Need an account? Sign Up"
-                : "Already have an account? Login"}
-            </p>
-
-            {isLogin && (
-              <p className="reset" onClick={handleResetPassword}>
-                Forgot Password?
-              </p>
+            <h2>Phone Login</h2>
+            {!confirmationResult ? (
+              <form onSubmit={handleSendOtp}>
+                <input
+                  type="text"
+                  placeholder="+91 1234567890"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                />
+                <button type="submit">Send OTP</button>
+                <div id="recaptcha-container"></div>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyOtp}>
+                <input
+                  type="text"
+                  placeholder="Enter OTP"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  required
+                />
+                <button type="submit">Verify OTP</button>
+              </form>
             )}
-
-            <button onClick={handleGoogleLogin}>Login with Google</button>
           </div>
         )}
 
